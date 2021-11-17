@@ -38,7 +38,6 @@ struct Palette {
     uint8_t blue;
 };
 
-// TODO: Replace unique_ptr with vector
 struct ChunkInfo {
     ChunkInfo() : ChunkInfo("UNKNOWN", 0, 0) {}
     ChunkInfo(std::string_view chunkType, unsigned int dataLength, unsigned int crc) : 
