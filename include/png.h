@@ -40,12 +40,13 @@ struct Palette {
 
 // TODO: Replace unique_ptr with vector
 struct ChunkInfo {
-    ChunkInfo(std::string_view chunkType, std::unique_ptr<uint8_t[]> dataBuffer, unsigned int dataLength, unsigned int crc) :
-    type{chunkType}, buffer{std::move(dataBuffer)}, length{dataLength}, crc{crc} 
+    ChunkInfo() : ChunkInfo("UNKNOWN", 0, 0) {}
+    ChunkInfo(std::string_view chunkType, unsigned int dataLength, unsigned int crc) : 
+              type{chunkType},length{dataLength}, crc{crc} 
     {}
 
     std::string type;
-    std::unique_ptr<uint8_t[]> buffer;
+    std::vector<uint8_t> buffer;
     unsigned int length;
     unsigned int crc;
 };

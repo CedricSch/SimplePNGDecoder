@@ -2,31 +2,6 @@
 #include "png_utils.h"
 #include "zlib_utils.h"
 
-std::ostream& operator<<(std::ostream& out, ColourType colourType) {
-    switch(colourType) {
-
-        case ColourType::greyscale: out << "greyscale";
-        break;
-
-        case ColourType::greyscale_with_alpha: out << "greyscale_with_alpha";
-        break;
-
-        case ColourType::indexed_colour: out << "indexed_colour";
-        break;
-
-        case ColourType::truecolour : out << "truecolour";
-        break;
-
-        case ColourType::truecolour_with_alpha: out << "truecolour_with_alpha";
-        break;
-
-        default: out << "\"" << colourType << "\" unkown colour type.";
-        break;
-    }
-
-    return out;
-}
-
 bool readPNGSignature(std::ifstream& stream) {
     uint8_t buffer[8]{};
     stream.read((char*) buffer, 8);
@@ -111,10 +86,12 @@ void processPLTE(const ChunkInfo& chunk, PNGData& data) {
     data.plaette = palette;
 }
 
+// TODO: check crc
 void processIDAT(const ChunkInfo& chunk, std::vector<uint8_t>& data) {
-    std::copy(&chunk.buffer[0], &chunk.buffer[0] + chunk.length, std::back_inserter(data));
+    data.insert(data.cend(), chunk.buffer.cbegin(), chunk.buffer.cend());
 }
 
+// TODO: check if reads are successfull
 ChunkInfo readChunk(std::ifstream& stream) {
     unsigned int length{0};
     unsigned int crc{0};
@@ -127,18 +104,23 @@ ChunkInfo readChunk(std::ifstream& stream) {
     stream.read(chunkType, 4);
 
     length = byteArrayToInteger(lengthBuffer);
-    std::unique_ptr<uint8_t[]> buffer{new uint8_t[length]};
+    ChunkInfo chunk{};
 
     if(length > 0) 
     {
-        stream.read((char*) buffer.get(), length);
+        chunk.buffer.resize(length);
+        stream.read((char*) chunk.buffer.data(), length);
         std::cout << "Successfully read chunk data for chunk type \"" << std::string{chunkType} << "\" with length \"" << length << "\"\n";
     }
 
     stream.read((char*) crcBuffer, 4);
     crc = byteArrayToInteger(crcBuffer);
 
-    return ChunkInfo{std::string{chunkType}, std::move(buffer), length, crc};
+    chunk.type = chunkType;
+    chunk.length = length;
+    chunk.crc = crc;
+
+    return chunk;
 }
 
 // TODO: Handle interlace
