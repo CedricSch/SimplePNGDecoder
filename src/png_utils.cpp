@@ -41,7 +41,7 @@ std::ostream& operator<<(std::ostream& out, ColourType colourType) {
     return out;
 }
 
-void print_png_header(const PNGData& data) {
+void printPngHeader(const PNGData& data) {
     std::cout << "Start reading a png file\n";
 
     std::cout << "\n-------------------------------------------------------------------------------\nImage Header\n-------------------------------------------------------------------------------\n";

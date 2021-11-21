@@ -44,6 +44,6 @@ inline unsigned getScanlineWidth(unsigned int width, ColourType colourType, unsi
 
 uint8_t paethPredictor(uint8_t a, uint8_t b, uint8_t c);
 
-void print_png_header(const PNGData& data);
+void printPngHeader(const PNGData& data);
 
 #endif
