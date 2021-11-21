@@ -1,6 +1,7 @@
 #include "png.h"
 #include "png_utils.h"
 #include "zlib_utils.h"
+#include "png_exceptions.h"
 
 bool readPNGSignature(std::ifstream& stream) {
     uint8_t buffer[8]{};
@@ -9,7 +10,6 @@ bool readPNGSignature(std::ifstream& stream) {
     return buffer[0] == 137 and buffer[1] == 80 and buffer[2] == 78 and buffer[3] == 71 and
            buffer[4] == 13  and buffer[5] == 10 and buffer[6] == 26 and buffer[7] == 10;
 }
-
 
 // TODO: Indexed colours dont work
 void reconstructScanlines(const std::vector<uint8_t>& inflatedInput, std::vector<uint8_t>& output, const ImageHeader& header) {
@@ -51,8 +51,7 @@ void reconstructScanlines(const std::vector<uint8_t>& inflatedInput, std::vector
                 break;
 
                 default:
-                    std::cerr << "Encountered unsupported filter type: " << +filterType << "\n";
-                    throw std::runtime_error("Encountered unsupported filter type.");
+                    throw PNGDecodeException("Can't reconstruct scanline. Unknown filter type: " + std::to_string(filterType));
             }
             output.push_back(x);
         }
@@ -110,7 +109,6 @@ ChunkInfo readChunk(std::ifstream& stream) {
     {
         chunk.buffer.resize(length);
         stream.read((char*) chunk.buffer.data(), length);
-        std::cout << "Successfully read chunk data for chunk type \"" << std::string{chunkType} << "\" with length \"" << length << "\"\n";
     }
 
     stream.read((char*) crcBuffer, 4);
@@ -126,28 +124,19 @@ ChunkInfo readChunk(std::ifstream& stream) {
 // TODO: Handle interlace
 PNGData readPng(const std::string& path) {
     std::ifstream file{path, std::ios_base::binary};
+    file.exceptions(std::ios_base::failbit | std::ios_base::badbit);
+
     std::vector<uint8_t> deflatedOutput{};
-    
     PNGData pngData{};
 
-    if(not file.is_open()) {
-        // TODO: Better error message
-        std::cout << "File could not be opened." << std::endl;
-        return pngData;
-    }
-
-    if (not readPNGSignature(file)) {
-        std::cout << "Image has invalid png signature" << std::endl;
-        file.close();
-    }
+    if (not readPNGSignature(file))
+        throw PNGDecodeException("Invalid png signature.");
 
     // First chunk needs to be IHDR
     ChunkInfo chunkInfo{readChunk(file)};
 
-    if (chunkInfo.type != "IHDR") {
-        std::cout << "First chunk after signature not \"IHDR\".PNG cannot be processed.\n";
-        return pngData;
-    }
+    if (chunkInfo.type != "IHDR")
+        throw PNGDecodeException("First chunk after signature not from type \"IHDR\".");
 
     processIHDR(chunkInfo, pngData);
 
@@ -161,18 +150,13 @@ PNGData readPng(const std::string& path) {
             processPLTE(chunkInfo, pngData);
         }
         else {
-            std::cout << "Cant process chunk \"" + chunkInfo.type + "\"\n";
+            std::cerr << "Can't process chunk \"" + chunkInfo.type + "\"\n";
         }
     } while (not file.eof() and chunkInfo.type != "IEND");
+  
+    unsigned int scanlineWidth{getScanlineWidth(pngData.header.width, pngData.header.colourType, pngData.header.bitDepth)};
+    std::vector<uint8_t> inflatedOutput = decompress(deflatedOutput, pngData.header.height, scanlineWidth);
+    reconstructScanlines(inflatedOutput, pngData.imageData, pngData.header);
 
-    file.close();
-    
-    try {
-        unsigned int scanlineWidth{getScanlineWidth(pngData.header.width, pngData.header.colourType, pngData.header.bitDepth)};
-        std::vector<uint8_t> inflatedOutput = decompress(deflatedOutput, pngData.header.height, scanlineWidth);
-        reconstructScanlines(inflatedOutput, pngData.imageData, pngData.header);
-    } catch(std::exception& ex) {
-        std::cerr << ex.what() << "\n";
-    }
     return pngData;
 }

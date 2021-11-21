@@ -1,4 +1,26 @@
 #include "zlib_utils.h"
+#include "png_exceptions.h"
+
+inline std::string zerrorToString(int ret)
+{
+    switch (ret) {
+    case Z_STREAM_ERROR:
+        return std::string{"Z_STREAM_ERROR"};
+        break;
+    case Z_DATA_ERROR:
+        return std::string{"Z_DATA_ERROR"};
+        break;
+    case Z_MEM_ERROR:
+        return std::string{"Z_MEM_ERROR"};
+        break;
+    case Z_VERSION_ERROR:
+        return std::string{"Z_VERSION_ERROR"};
+        break;
+    default:
+        return std::string{"UNKNOWN ERROR"};
+        break;
+    }
+}
 
 // TODO: Only works if image is not interlaced
 std::vector<uint8_t> decompress(std::vector<uint8_t>& in, unsigned int height, unsigned int scanlineWidth) {
@@ -6,8 +28,6 @@ std::vector<uint8_t> decompress(std::vector<uint8_t>& in, unsigned int height, u
 
     std::vector<uint8_t> out{};
     out.resize(BUFFER_SIZE);
-
-    std::cout << "Calculated size for uncompressed data buffer: " << BUFFER_SIZE << std::endl;
 
     unsigned have;
     z_stream strm;
@@ -18,8 +38,9 @@ std::vector<uint8_t> decompress(std::vector<uint8_t>& in, unsigned int height, u
     strm.avail_in = 0;
     strm.next_in = Z_NULL;
     int ret = inflateInit(&strm);
+
     if (ret != Z_OK)
-        throw std::runtime_error("ERROR::png::decompress::inflateInit. Errno: " + ret);
+        throw PNGDecodeException("Zlib initialization not possible: " + zerrorToString(ret));
 
     do {
         strm.avail_in = in.size();
@@ -33,14 +54,15 @@ std::vector<uint8_t> decompress(std::vector<uint8_t>& in, unsigned int height, u
             strm.next_out = out.data();
 
             ret = inflate(&strm, Z_NO_FLUSH);
-            // assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
+            assert(ret != Z_STREAM_ERROR);  /* state not clobbered */
+
             switch (ret) {
             case Z_NEED_DICT:
                 ret = Z_DATA_ERROR;     /* and fall through */
             case Z_DATA_ERROR:
             case Z_MEM_ERROR:
                 (void)inflateEnd(&strm);
-                throw std::runtime_error("ERROR::png::decompress::Z_MEM_ERROR.");
+                throw PNGDecodeException("Inflation of buffer not possible: " + zerrorToString(ret));
             }
             have = BUFFER_SIZE - strm.avail_out;
 
