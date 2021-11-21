@@ -9,7 +9,9 @@ set(SRC_LIST src/main.cpp src/png.cpp src/png_utils.cpp src/zlib_utils.cpp)
 # find zlib package e.g FindZLIB.cmake
 find_package(ZLIB REQUIRED)
 
-add_executable(main ${SRC_LIST})
+add_library(spng SHARED ${SRC_LIST})
 
-target_link_libraries(main ZLIB::ZLIB)
-target_include_directories(main PUBLIC include)
+target_link_libraries(spng ZLIB::ZLIB)
+target_include_directories(spng PUBLIC include)
+
+install(TARGETS spng LIBRARY DESTINATION /usr/lib)
