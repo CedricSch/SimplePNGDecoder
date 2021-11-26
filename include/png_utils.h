@@ -1,10 +1,11 @@
 #ifndef PNG_UTILS_H_
 #define PNG_UTILS_H_
 
+#include <ranges>
 #include "png.h"
 
 // TODO: Is this safe across platforms ? If not convert it into network byte order
-inline unsigned int byteArrayToInteger(uint8_t (&b)[4]) 
+inline unsigned int byteArrayToInteger(const uint8_t (&b)[4]) 
 {
     unsigned int result{0};
 
@@ -42,8 +43,9 @@ inline unsigned getScanlineWidth(unsigned int width, ColourType colourType, unsi
   return 1 + (width * getBytesPerColourType(colourType) * bitDepth ) / 8;
 }
 
-uint8_t paethPredictor(uint8_t a, uint8_t b, uint8_t c);
+uint8_t paethPredictor(uint8_t, uint8_t, uint8_t);
 
-void printPngHeader(const PNGData& data);
+void printPngHeader(const PNGData&);
+void flipY(const ImageHeader&, std::vector<uint8_t>&);
 
 #endif

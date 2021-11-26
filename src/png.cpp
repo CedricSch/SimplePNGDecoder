@@ -11,11 +11,44 @@ bool readPNGSignature(std::ifstream& stream) {
            buffer[4] == 13  and buffer[5] == 10 and buffer[6] == 26 and buffer[7] == 10;
 }
 
+uint8_t applyScanlineFilter(uint8_t filterType, uint8_t unfilteredByte, uint8_t a, uint8_t b, uint8_t c) {
+    uint8_t result{};
+
+    switch(filterType) {
+                case 0:
+                    result = unfilteredByte;
+                break;
+
+                case 1:
+                    result = unfilteredByte + a;
+                break;
+
+                case 2:
+                    result = unfilteredByte + b;
+                break;
+
+                case 3:
+                    result = unfilteredByte + ((a + b) / 2);
+                break;
+
+                case 4:
+                    result = unfilteredByte + paethPredictor(a, b, c);
+                break;
+
+                default:
+                    throw PNGDecodeException("Can't reconstruct scanline. Unknown filter type: " + std::to_string(filterType));
+    }
+
+    return result;
+}
+
 // TODO: Indexed colours dont work
-void reconstructScanlines(const std::vector<uint8_t>& inflatedInput, std::vector<uint8_t>& output, const ImageHeader& header) {
+std::vector<uint8_t> reconstructScanlines(const std::vector<uint8_t>& inflatedInput, const ImageHeader& header) {
     size_t scanlineWidth{getScanlineWidth(header.width, header.colourType, header.bitDepth)};
     size_t stride{scanlineWidth - 1};
     size_t bytesPerPixel{getBytesPerColourType(header.colourType) * header.bitDepth / 8u };
+
+    std::vector<uint8_t> output{};
 
     for(int currentScanline{0}; currentScanline < header.height; currentScanline++) {
         uint8_t filterType{inflatedInput[currentScanline*scanlineWidth]};
@@ -24,38 +57,20 @@ void reconstructScanlines(const std::vector<uint8_t>& inflatedInput, std::vector
         {
             size_t nextFilteredBytePosition{currentScanline * scanlineWidth + currentScanlinePosition + 1};
 
-            int x{};
+            // previous byte
             uint8_t a = ( currentScanlinePosition >= bytesPerPixel                        ) ? output[ (currentScanline       * stride) + currentScanlinePosition - bytesPerPixel] : 0;
+            // byte from last scanline
             uint8_t b = ( currentScanline > 0                                             ) ? output[ ((currentScanline - 1) * stride) + currentScanlinePosition                ] : 0;
+            // previous byte from last scanline
             uint8_t c = ( currentScanline > 0 and currentScanlinePosition >= bytesPerPixel) ? output[ ((currentScanline - 1) * stride) + currentScanlinePosition - bytesPerPixel] : 0;
 
-            switch(filterType) {
-                case 0:
-                    x = inflatedInput[nextFilteredBytePosition];
-                break;
-
-                case 1:
-                    x = inflatedInput[nextFilteredBytePosition] + a;
-                break;
-
-                case 2:
-                    x = inflatedInput[nextFilteredBytePosition] + b;
-                break;
-
-                case 3:
-                    x = inflatedInput[nextFilteredBytePosition] + ((a + b) / 2);
-                break;
-
-                case 4:
-                    x = inflatedInput[nextFilteredBytePosition] + paethPredictor(a, b, c);
-                break;
-
-                default:
-                    throw PNGDecodeException("Can't reconstruct scanline. Unknown filter type: " + std::to_string(filterType));
-            }
-            output.push_back(x);
+            uint8_t result = applyScanlineFilter(filterType, inflatedInput[nextFilteredBytePosition], a, b, c);
+        
+            output.push_back(result);
         }
     }
+
+    return output;
 }
 
 void processIHDR(const ChunkInfo& chunk, PNGData& data) {
@@ -156,7 +171,7 @@ PNGData readPng(const std::string& path) {
   
     unsigned int scanlineWidth{getScanlineWidth(pngData.header.width, pngData.header.colourType, pngData.header.bitDepth)};
     std::vector<uint8_t> inflatedOutput = decompress(deflatedOutput, pngData.header.height, scanlineWidth);
-    reconstructScanlines(inflatedOutput, pngData.imageData, pngData.header);
+    pngData.imageData = reconstructScanlines(inflatedOutput, pngData.header);
 
     return pngData;
 }

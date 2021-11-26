@@ -57,7 +57,28 @@ void printPngHeader(const PNGData& data) {
     std::cout << "Blue: " << +data.plaette.blue;
     std::cout << "\n-------------------------------------------------------------------------------\n";
 
+    #ifdef PRINT_IMAGE_DATA_VERBOSE
     std::cout << "\n-------------------------------------------------------------------------------\nInflated data\n-------------------------------------------------------------------------------\n";
     std::for_each(data.imageData.cbegin(), data.imageData.cend(), [](uint8_t b){ std::cout << +b << " "; });
     std::cout << "\n-------------------------------------------------------------------------------\n";
+    #endif
+}
+
+void flipY(const ImageHeader& header, std::vector<uint8_t>& data) {
+  size_t stride = getScanlineWidth(header.width, header.colourType, header.bitDepth) - 1;
+  
+  for(size_t top = 0, bottom = header.height-1; top < bottom and bottom > top; top++, bottom--) {
+    size_t topScanline{top*stride};
+    size_t bottomScanline{bottom*stride};
+
+    std::vector<uint8_t> cp(data.begin() + topScanline, data.begin() + topScanline + stride);
+
+    for(int i = 0; i < stride; i++) {
+      data[topScanline + i] = data[bottomScanline + i];
+    }
+
+    for(int i = 0; i < stride; i++) {
+      data[bottomScanline + i] = cp[i];
+    }
+  }
 }
